@@ -57,16 +57,28 @@ const createClass = async (req, res, next) => {
 const getMyClasses = async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const created = user.createdClasses || [];
+    const joined = user.joinedClasses || [];
     const allClassIds = [...new Set([
-      ...user.createdClasses.map(id => id.toString()),
-      ...user.joinedClasses.map(id => id.toString()),
+      ...created.map(id => id.toString()),
+      ...joined.map(id => id.toString()),
     ])];
 
     const classes = await Class.find({ _id: { $in: allClassIds } })
       .populate('owner', 'name email')
       .sort({ createdAt: -1 });
 
-    res.json({ success: true, data: classes });
+    // Add isOwner flag for frontend filtering
+    const classesWithOwnerFlag = classes.map(cls => ({
+      ...cls.toObject(),
+      isOwner: cls.owner ? cls.owner._id.toString() === req.user._id.toString() : false
+    }));
+
+    res.json({ success: true, data: classesWithOwnerFlag });
   } catch (err) {
     next(err);
   }
